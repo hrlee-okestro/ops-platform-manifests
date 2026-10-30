@@ -1,0 +1,120 @@
+# Claude(AI 어시스턴트) 전용 읽기 전용 접근 권한.
+#
+# - 사용자가 admin 권한으로 직접 적용한다 (Claude는 적용하지 않는다).
+# - ArgoCD가 관리하지 않는 부트스트랩 리소스다. Application이 이 디렉토리를 가리키게 하지 않는다.
+# - 최소 권한 원칙: Secret은 어디에서도 읽을 수 없고, 기존 서비스의 워크로드(Pod 스펙, 로그)는
+#   읽을 수 없다. 클러스터 전체에서는 인프라 메타데이터만, 워크로드 상세는 우리 네임스페이스에서만 읽는다.
+#
+# 적용 방법 (맥의 기본 kubectl 컨텍스트는 다른 클러스터를 가리킬 수 있으므로 맥에서 직접 apply하지 않는다):
+#   deploy 서버로 파일 내용을 파이프로 넘겨 실행한다. 서버에 파일이 남지 않는다.
+#   0) 대상 클러스터 확인:  ssh root@<deploy-ip> 'kubectl get nodes'     # 의도한 노드인지 확인
+#   1) 변경 미리보기:       ssh root@<deploy-ip> 'kubectl diff -f -' < bootstrap/claude-readonly-rbac.yaml
+#   2) 서버 검증(적용 안 됨): ssh root@<deploy-ip> 'kubectl apply --dry-run=server -f -' < bootstrap/claude-readonly-rbac.yaml
+#   3) 적용:                ssh root@<deploy-ip> 'kubectl apply -f -' < bootstrap/claude-readonly-rbac.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ops-platform
+  # Istio sidecar injection 라벨을 붙이지 않는다.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: claude-readonly
+  namespace: ops-platform
+---
+# 클러스터 범위: 인프라 메타데이터 조회만 (워크로드/Secret 없음)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ops-claude-readonly-cluster
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingressclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ops-claude-readonly-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ops-claude-readonly-cluster
+subjects:
+  - kind: ServiceAccount
+    name: claude-readonly
+    namespace: ops-platform
+---
+# 네임스페이스 범위: 우리 네임스페이스의 워크로드와 로그 조회 (Secret 제외)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ops-claude-readonly-ns
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - configmaps
+      - persistentvolumeclaims
+      - events
+      - serviceaccounts
+      - resourcequotas
+      - limitranges
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "appprojects", "applicationsets"]
+    verbs: ["get", "list", "watch"]
+  # Secret은 의도적으로 제외한다.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-claude-readonly-ns
+  namespace: ops-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ops-claude-readonly-ns
+subjects:
+  - kind: ServiceAccount
+    name: claude-readonly
+    namespace: ops-platform
+# argocd, monitoring 네임스페이스를 만든 뒤에는 같은 RoleBinding을 해당 네임스페이스에도 추가한다.
+# (네임스페이스가 없으면 RoleBinding을 만들 수 없다.) 예:
+#   kubectl create rolebinding ops-claude-readonly-ns -n argocd \
+#     --clusterrole=ops-claude-readonly-ns --serviceaccount=ops-platform:claude-readonly
