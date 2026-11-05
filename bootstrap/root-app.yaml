@@ -1,0 +1,34 @@
+# App of Apps의 root Application. 이 저장소의 apps/ 디렉토리를 감시하고, 그 안의 자식 Application을 생성한다.
+# 이후 앱 추가는 apps/에 Application YAML을 PR로 올리는 것만으로 이루어진다 (PR 머지 = 배포).
+#
+# - 사용자가 직접 한 번만 적용한다 (Claude는 적용하지 않는다). 사전 조건: AppProject(appproject.yaml) 적용,
+#   apps/ 디렉토리가 main 브랜치에 push되어 있을 것.
+# - ArgoCD가 관리하지 않는 부트스트랩 리소스다. apps/ 안에 이 파일을 넣지 않는다.
+#
+# 동기화 정책 (사용자 승인, 2026-11-05):
+#   - automated + selfHeal: 머지하면 자동 반영하고, 클러스터에서 수동으로 바꾼 값은 Git 상태로 되돌린다.
+#   - prune 끔: Git에서 지워도 클러스터 리소스는 자동 삭제하지 않는다 (PVC/Secret 같은 데이터 보호).
+#     삭제가 필요하면 UI에서 수동 Sync(prune)를 하거나, 안전을 확인한 뒤 prune을 켠다(사용자 승인).
+#
+# 적용 방법 (deploy 서버로 파이프):
+#   1) 변경 미리보기:        ssh root@<deploy-ip> 'kubectl diff -f -' < bootstrap/root-app.yaml
+#   2) 서버 검증(적용 안 됨): ssh root@<deploy-ip> 'kubectl apply --dry-run=server -f -' < bootstrap/root-app.yaml
+#   3) 적용:                 ssh root@<deploy-ip> 'kubectl apply -f -' < bootstrap/root-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: ops-platform
+  source:
+    repoURL: https://github.com/hrlee-okestro/ops-platform-manifests.git
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

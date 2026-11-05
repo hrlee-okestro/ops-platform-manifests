@@ -1,0 +1,64 @@
+# ArgoCD Helm 차트(argo/argo-cd 10.11.7, ArgoCD v3.5.7) 경량 설정.
+# 근거: ops-platform/docs/adr/0001-capacity-and-placement.md
+#
+# - 메모리 limits 합계 1,280Mi (controller 512 + server 256 + repo-server 256 + applicationSet 128 + redis 128).
+# - 노드 배치(nodeAffinity의 호스트명)는 저장소에 두지 않는다. values-local.yaml(gitignore)에서 주입한다.
+#   예시는 values-local.example.yaml.
+
+# 기본 설치(클러스터 범위 ClusterRole 포함). 컨트롤러 권한이 넓으므로 배포 대상은 AppProject의
+# destinations 화이트리스트(argocd, ops-platform, monitoring)로 제한한다.
+# 근거: ops-platform/docs/adr/0002-argocd-install-scope.md
+createClusterRoles: true
+
+# 단일 노드에 모으므로 anti-affinity는 의미가 없다.
+global:
+  affinity:
+    podAntiAffinity: none
+    nodeAffinity:
+      type: soft   # preferred. 호스트 조건은 values-local.yaml에서 지정
+
+configs:
+  params:
+    # TLS는 앞단(ingress)에서 처리한다. 접속 방식은 이후 단계에서 결정.
+    server.insecure: true
+
+controller:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+server:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+
+repoServer:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+
+applicationSet:
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits:   { cpu: 100m, memory: 128Mi }
+
+redis:
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits:   { cpu: 100m, memory: 128Mi }
+
+redisSecretInit:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits:   { cpu: 100m, memory: 64Mi }
+
+# 쓰지 않는 컴포넌트는 끈다 (SSO 미사용, 알림은 이후 필요 시).
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

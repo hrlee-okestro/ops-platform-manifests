@@ -1,0 +1,10 @@
+# 복사해서 values-local.yaml로 만들고 실제 값을 넣는다 (values-local.yaml은 gitignore 대상, 커밋 금지).
+#   cp values-local.example.yaml values-local.yaml
+global:
+  affinity:
+    nodeAffinity:
+      matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+            - <WORKLOAD_NODE>   # 배치할 노드의 호스트명 (ADR 0001의 node-3)

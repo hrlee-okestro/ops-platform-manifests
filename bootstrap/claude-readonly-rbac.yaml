@@ -114,7 +114,33 @@ subjects:
   - kind: ServiceAccount
     name: claude-readonly
     namespace: ops-platform
-# argocd, monitoring 네임스페이스를 만든 뒤에는 같은 RoleBinding을 해당 네임스페이스에도 추가한다.
-# (네임스페이스가 없으면 RoleBinding을 만들 수 없다.) 예:
-#   kubectl create rolebinding ops-claude-readonly-ns -n argocd \
-#     --clusterrole=ops-claude-readonly-ns --serviceaccount=ops-platform:claude-readonly
+---
+# argocd, monitoring 네임스페이스에도 같은 읽기 전용 권한을 부여한다 (Secret 제외).
+# 네임스페이스가 먼저 있어야 한다 (bootstrap/namespaces.yaml).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-claude-readonly-ns
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ops-claude-readonly-ns
+subjects:
+  - kind: ServiceAccount
+    name: claude-readonly
+    namespace: ops-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-claude-readonly-ns
+  namespace: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ops-claude-readonly-ns
+subjects:
+  - kind: ServiceAccount
+    name: claude-readonly
+    namespace: ops-platform

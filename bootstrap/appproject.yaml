@@ -1,0 +1,36 @@
+# ops-platform 전용 AppProject. 모든 Application은 기본 `default` 프로젝트 대신 이 프로젝트를 사용한다.
+#
+# ArgoCD 컨트롤러는 클러스터 범위 권한을 가지므로(docs/adr/0002 in ops-platform) 이 프로젝트의 제한이
+# 기존 서비스 네임스페이스를 보호하는 핵심 장치다.
+#   - destinations: argocd, ops-platform, monitoring 세 네임스페이스로만 배포할 수 있다.
+#   - sourceRepos: 허용한 저장소에서만 매니페스트를 가져온다.
+#   - clusterResourceWhitelist: 비어 있음 = 클러스터 범위 리소스(CRD, ClusterRole 등)는 배포할 수 없다.
+#     단계 2(Operator CRD)와 단계 4(모니터링 CRD)에서 필요해지면 그 시점에 종류를 지정해 추가한다.
+#
+# - 사용자가 직접 적용한다 (Claude는 적용하지 않는다). 네임스페이스 범위 리소스다.
+# - ArgoCD가 관리하지 않는 부트스트랩 리소스다. Application이 이 디렉토리를 가리키게 하지 않는다.
+#
+# 적용 방법 (deploy 서버로 파이프):
+#   1) 변경 미리보기:        ssh root@<deploy-ip> 'kubectl diff -f -' < bootstrap/appproject.yaml
+#   2) 서버 검증(적용 안 됨): ssh root@<deploy-ip> 'kubectl apply --dry-run=server -f -' < bootstrap/appproject.yaml
+#   3) 적용:                 ssh root@<deploy-ip> 'kubectl apply -f -' < bootstrap/appproject.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ops-platform
+  namespace: argocd
+spec:
+  description: ops-platform 전용 프로젝트 (argocd, ops-platform, monitoring 네임스페이스만 대상)
+  sourceRepos:
+    - https://github.com/hrlee-okestro/ops-platform-manifests.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    - server: https://kubernetes.default.svc
+      namespace: ops-platform
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
