@@ -20,7 +20,7 @@ ops-platform의 GitOps 매니페스트 저장소. ArgoCD가 이 저장소를 감
 
 ## 공개 저장소 규칙
 
-- 내부 IP, 호스트명, 도메인, 비밀번호, 토큰, kubeconfig를 커밋하지 않는다. 플레이스홀더(`<INGRESS_HOST>` 등)를 쓴다.
+- 내부 IP, 도메인, 비밀번호, 토큰, kubeconfig를 커밋하지 않는다. 플레이스홀더(`<INGRESS_HOST>` 등)를 쓴다. 노드 호스트명(`kwon-master-N`)은 사용자가 허용해 nodeAffinity 등에 그대로 써도 된다 (2026-11-06).
 - 시크릿 값은 매니페스트에 넣지 않는다 (Sealed Secrets/External Secrets 또는 수동 생성 후 참조).
 - **커밋과 push는 사용자가 직접 한다. Claude는 하지 않는다.** 규칙은 `../ops-platform/docs/GIT_CONVENTIONS.md`를 따른다.
 - `bootstrap/`은 ArgoCD가 관리하지 않는 수동 적용용 리소스다 (읽기 전용 RBAC 등). Application이 이 디렉토리를 가리키게 하지 않는다.
