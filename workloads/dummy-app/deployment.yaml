@@ -1,7 +1,7 @@
 # dummy-app: 장애 주입용 Spring Boot 앱. 이미지 태그는 kustomization.yaml의 images에서 관리한다 (CI가 갱신).
 #
-# 배치: 이 워크로드는 메모리 limit이 작아(256Mi) preferred nodeAffinity를 두지 않는다.
-#   노드 호스트명은 공개 저장소에 쓰지 않는 규칙이라 Git에 넣을 수 없기 때문이다 (docs/adr/0001 참고).
+# 배치: 우리 워크로드는 preferred nodeAffinity로 node-3에 모은다 (docs/adr/0001 참고).
+#   노드 호스트명을 이 공개 저장소에 쓰는 것은 사용자가 허용했다 (2026-11-06).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,6 +25,15 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: ["kwon-master-3"]
       containers:
         - name: dummy-app
           image: ghcr.io/hrlee-okestro/dummy-app
