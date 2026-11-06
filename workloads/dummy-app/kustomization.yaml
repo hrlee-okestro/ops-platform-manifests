@@ -6,4 +6,4 @@ resources:
 # CI가 이 값만 바꿔서 새 버전을 배포한다 (커밋 = 배포 이력).
 images:
   - name: ghcr.io/hrlee-okestro/dummy-app
-    newTag: 0.0.1
+    newTag: 6927f50
